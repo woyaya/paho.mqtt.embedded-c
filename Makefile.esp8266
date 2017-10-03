@@ -1,0 +1,78 @@
+################################################
+#       Makefile for ESP8266 RTOS SDK          #
+################################################
+include esp8266.env
+################################################
+PATH += :$(CROSS_TOOL_PATH)/xtensa-lx106-elf/bin
+CFLAGS += -I$(CROSS_TOOL_PATH)/sdk/include -L$(CROSS_TOOL_PATH)/sdk/lib 
+OSTYPE=freertos
+################################################
+#For ESP8266_RTOS_SDK
+ODIR := .output
+TARGET ?= eagle
+FLAVOR ?= debug
+LIBODIR ?= $(ODIR)/$(TARGET)/$(FLAVOR)/lib
+DEP_LIB = $(LIBODIR)/$(LIB)
+CFLAGS += $(CCFLAGS)
+################################################
+CROSS_COMPILER=xtensa-lx106-elf-
+CC=$(CROSS_COMPILER)gcc
+AR=$(CROSS_COMPILER)ar
+AS=$(CROSS_COMPILER)as
+CPP=$(CROSS_COMPILER)cpp
+LD=$(CROSS_COMPILER)ld
+NM=$(CROSS_COMPILER)nm
+STRIP=$(CROSS_COMPILER)strip
+
+MQTTCLIENT_PLATFORM_HEADER=MQTTESP8266.h
+
+SRC_DIR=MQTTClient-C/src/esp8266 MQTTClient-C/src MQTTPacket/src
+SRC := $(foreach dir,$(SRC_DIR),$(wildcard $(dir)/*.c))
+HEADER := $(foreach dir,$(SRC_DIR),$(wildcard $(dir)/*.h))
+OBJ := $(patsubst %.c,%.o,$(SRC))
+LIB := libmqtt.a
+
+CFLAGS += $(foreach dir,$(SRC_DIR), -I$(dir))
+CFLAGS += -I$(SDK_PATH)/include 
+CFLAGS += -I$(SDK_PATH)/include/freertos 
+CFLAGS += -I$(SDK_PATH)/include/espressif
+CFLAGS += -I$(SDK_PATH)/include/lwip
+CFLAGS += -I$(SDK_PATH)/include/lwip/ipv4
+CFLAGS += -I$(SDK_PATH)/include/lwip/ipv6
+CFLAGS += -I$(SDK_PATH)/extra_include
+LDFLAGS += -L$(SDK_PATH)/lib
+
+CFLAGS += -DMQTTCLIENT_PLATFORM_HEADER="$(MQTTCLIENT_PLATFORM_HEADER)" -DOSTYPE="$(OSTYPE)"
+CFLAGS += -Wall -Werror -fPIC
+
+INSTALL_DIR = $(PWD)/install
+LIB_INSTALL_DIR = $(INSTALL_DIR)/lib
+HEADER_INSTALL_DIR = $(INSTALL_DIR)/include
+
+all : $(LIB) $(DEP_LIB) install
+
+$(LIB) : $(OBJ) $(HEADER)
+	$(AR) cr $@ $(OBJ)
+
+$(DEP_LIB) : $(LIB)
+	-mkdir -p $(dir $@)
+	cp -rf $^ $@
+
+install: install_dir $(LIB) $(HEADER)
+	-cp -rf $(LIB) $(LIB_INSTALL_DIR)/
+	-cp -rf $(HEADER) $(HEADER_INSTALL_DIR)/
+	@echo -e "\n\n\n"
+	@echo "Add following flags to your CFLAGS"
+	@echo " -I$(HEADER_INSTALL_DIR)"
+	@echo "Add following flags to your LDFLAGS"
+	@echo " -L$(LIB_INSTALL_DIR) "
+	@echo ""
+	
+install_dir:
+	-@mkdir -p $(INSTALL_DIR)
+	-@mkdir -p $(LIB_INSTALL_DIR)
+	-@mkdir -p $(HEADER_INSTALL_DIR)
+
+clean:
+	-rm -rf $(OBJ) $(LIB) $(INSTALL_DIR) $(DEP_LIB) $(ODIR)
+
